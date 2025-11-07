@@ -12,12 +12,15 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Component
 public class JwtFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
     private final UserDetailsService userDetailsService;
+    private static final Logger logger = LoggerFactory.getLogger(JwtFilter.class);
 
     public JwtFilter(JwtUtil jwtUtil, UserDetailsService userDetailsService) {
         this.jwtUtil = jwtUtil;
@@ -27,9 +30,18 @@ public class JwtFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
-        String header = request.getHeader("Authorization");
-        if (header != null && header.startsWith("Bearer ")) {
-            String token = header.substring(7);
+
+        String token = null;
+        String authHeader = request.getHeader("Authorization"); //recommended - new method
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7);
+        } else {
+            String alt = request.getHeader("X-Auth-Token"); //(not recommended - old method)
+            if (alt != null && !alt.isBlank()) {
+                token = alt.trim();
+            }
+        }
+        if (token != null) {
             try {
                 var claims = jwtUtil.parseToken(token);
                 String username = claims.getSubject();
@@ -38,10 +50,27 @@ public class JwtFilter extends OncePerRequestFilter {
                     var auth = new UsernamePasswordAuthenticationToken(ud, null, ud.getAuthorities());
                     SecurityContextHolder.getContext().setAuthentication(auth);
                 }
+            } catch (io.jsonwebtoken.ExpiredJwtException ex) {
+                logger.warn("Expired token for request to {} from {}", request.getRequestURI(), request.getRemoteAddr());
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"error\":\"Token expired\"}");
+                return;
             } catch (Exception ex) {
-// invalid token: ignore and continue (endpoint can reject if needed)
+                logger.warn("Invalid token for request to {} from {} — {}", request.getRequestURI(), request.getRemoteAddr(), ex.getMessage());
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"error\":\"Invalid token\"}");
+                return;
             }
+        }else {
+            logger.warn("Invalid token for request to {} from {} — {}", request.getRequestURI(), request.getRemoteAddr(), "token: null");
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            response.getWriter().write("{\"error\":\"Invalid token\"}");
+            return;
         }
+
         filterChain.doFilter(request, response);
     }
 }
