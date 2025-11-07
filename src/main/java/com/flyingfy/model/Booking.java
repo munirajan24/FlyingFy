@@ -1,5 +1,6 @@
 package com.flyingfy.model;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 
@@ -15,6 +16,11 @@ public class Booking {
     private String destination;
     private LocalDate travelDate;
     private String providerPnr;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    @JsonBackReference
+    private User user;
 
     public Booking() {
     }
@@ -66,4 +72,6 @@ public class Booking {
     public void setProviderPnr(String providerPnr) {
         this.providerPnr = providerPnr;
     }
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
 }
