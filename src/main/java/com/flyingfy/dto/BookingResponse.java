@@ -1,29 +1,14 @@
-package com.flyingfy.model;
+package com.flyingfy.dto;
 
-import com.fasterxml.jackson.annotation.JsonBackReference;
-import jakarta.persistence.*;
 import java.time.LocalDate;
 
-@Entity
-@Table(name = "bookings")
-public class Booking {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+public class BookingResponse {
     private Long id;
-
     private String passengerName;
     private String origin;
     private String destination;
     private LocalDate travelDate;
     private String providerPnr;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id")
-    @JsonBackReference
-    private User user;
-
-    public Booking() {
-    }
 
     public Long getId() {
         return id;
@@ -72,6 +57,5 @@ public class Booking {
     public void setProviderPnr(String providerPnr) {
         this.providerPnr = providerPnr;
     }
-    public User getUser() { return user; }
-    public void setUser(User user) { this.user = user; }
+
 }
