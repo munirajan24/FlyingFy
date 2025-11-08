@@ -26,21 +26,24 @@ public class JwtFilter extends OncePerRequestFilter {
         this.jwtUtil = jwtUtil;
         this.userDetailsService = userDetailsService;
     }
-
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
+
+
         String token = null;
-        String authHeader = request.getHeader("Authorization"); //recommended - new method
+        String authHeader = request.getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            token = authHeader.substring(7);
+            token = authHeader.substring(7).trim();
         } else {
-            String alt = request.getHeader("X-Auth-Token"); //(not recommended - old method)
+            String alt = request.getHeader("X-Auth-Token");
             if (alt != null && !alt.isBlank()) {
                 token = alt.trim();
             }
         }
+
+
         if (token != null) {
             try {
                 var claims = jwtUtil.parseToken(token);
@@ -52,25 +55,22 @@ public class JwtFilter extends OncePerRequestFilter {
                 }
             } catch (io.jsonwebtoken.ExpiredJwtException ex) {
                 logger.warn("Expired token for request to {} from {}", request.getRequestURI(), request.getRemoteAddr());
-                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                response.setContentType("application/json");
-                response.getWriter().write("{\"error\":\"Token expired\"}");
+                sendUnauthorized(response, "Token expired");
                 return;
             } catch (Exception ex) {
-                logger.warn("Invalid token for request to {} from {} — {}", request.getRequestURI(), request.getRemoteAddr(), ex.getMessage());
-                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                response.setContentType("application/json");
-                response.getWriter().write("{\"error\":\"Invalid token\"}");
+                logger.warn("Invalid token for request to {} from {}: {}", request.getRequestURI(), request.getRemoteAddr(), ex.getMessage());
+                sendUnauthorized(response, "Invalid token");
                 return;
             }
-        }else {
-            logger.warn("Invalid token for request to {} from {} — {}", request.getRequestURI(), request.getRemoteAddr(), "token: null");
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.setContentType("application/json");
-            response.getWriter().write("{\"error\":\"Invalid token\"}");
-            return;
         }
 
+
         filterChain.doFilter(request, response);
+    }
+
+    private void sendUnauthorized(HttpServletResponse response, String message) throws IOException {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/json;charset=UTF-8");
+        response.getWriter().write("{\"error\":\"" + message + "\"}");
     }
 }
